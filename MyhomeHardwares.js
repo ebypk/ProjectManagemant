@@ -1,94 +1,133 @@
 const Order = require("./Order");
-
+const Tax_Pay = 0.13;
 const OrderState = Object.freeze({
-    WELCOMING:   Symbol("welcoming"),
-    PRODUCTS:   Symbol("products"),
-    UPSELL:   Symbol("upsel"),
-    EXTRAS:  Symbol("extras")
+    WELCOMING: Symbol("welcoming"),
+    PRODUCTS: Symbol("products"),
+    UPSELL: Symbol("upsel"),
+    EXTRAS: Symbol("extras"),
+    CHECKOUT: Symbol("checkout")
 });
 
-module.exports = class CurbsideHardwares extends Order{
-    constructor(sNumber, sUrl){
+module.exports = class CurbsideHardwares extends Order {
+    constructor(sNumber, sUrl) {
         super(sNumber, sUrl);
         this.stateCur = OrderState.WELCOMING;
         this.cCategory = "";
         this.sProduct = "";
-        this.uUpsell= "";
+        this.uUpsell = "";
         this.sExtras = "";
+        this.oOrder = "";
+        this.nTotal = 0;
+        this.sSuccessMsg = "";
+        this.tax = "";
+        this.totalPay = "";
     }
-    handleInput(sInput){
+    handleInput(sInput) {
         let aReturn = [];
-        switch(this.stateCur){
+        switch (this.stateCur) {
             case OrderState.WELCOMING:
                 this.stateCur = OrderState.FOOD;
-                aReturn.push("Welcome to Curbside Hardwares.<br /> Your Home Hardware Store.");
-                aReturn.push(`Find out what's in our store from below link:`);
-                aReturn.push(`${this.sUrl}/payment/${this.sNumber}/`);
-                if(sInput.toLowerCase() == "cleaning"){
-                  this.cCategory = "broom";
-                }else if(sInput.toLowerCase() == "electrical") {
-                  this.cCategory = "light";
+                if (this.sExtras == "") {
+                    aReturn.push("Welcome to MyHome Hardwares.<br /> Your Home Hardware Store.");
+                    aReturn.push(`Find out what's in our store from below link:`);
+                    aReturn.push(`${this.sUrl}/categories/${this.sNumber}/`);
+                }
+                if (sInput.toLowerCase() == "cleaning") {
+                    this.cCategory = "broom";
+                } else if (sInput.toLowerCase() == "electrical") {
+                    this.cCategory = "light";
                 } else {
-                  this.stateCur = OrderState.WELCOMING;
-                  aReturn.push("Please type 'CLEANING' if you need cleaning items or 'ELECTRICAL' if you need electrical items.");
-                  break;
+                    this.stateCur = OrderState.WELCOMING;
+                    aReturn.push("Please type 'CLEANING' if you need cleaning items or 'ELECTRICAL' if you need electrical items.");
+                    break;
                 }
             case OrderState.PRODUCTS:
-                if(this.cCategory == "broom"){
-                  this.stateCur = OrderState.UPSELL;
-                  aReturn.push(`Would you like to buy 1. Brooms and Dust Bins, 2. Snow shovels`);
-                  aReturn.push(`Enter the product code 1 or 2`);
-                }else{
-                  this.stateCur = OrderState.UPSELL;
-                  aReturn.push(`Would you like to buy 1. Light Bulbs, 2. Led Light, 3.Electric kettle`);
-                  aReturn.push(`Enter the product code 1, 2 or 3`);
+                if (this.cCategory == "broom") {
+                    this.stateCur = OrderState.UPSELL;
+                    aReturn.push(`Would you like to buy 1. Brooms and Dust Bins, 2. Snow shovels`);
+                    aReturn.push(`Enter the product code 1 or 2`);
+                } else {
+                    this.stateCur = OrderState.UPSELL;
+                    aReturn.push(`Would you like to buy 1. Light Bulbs, 2. Led Light, 3.Electric kettle`);
+                    aReturn.push(`Enter the product code 1, 2 or 3`);
                 }
-                if(sInput.toLowerCase()!= "no"){
-                  this.sProduct = sInput;
+                if (sInput.toLowerCase() != "no") {
+                    this.sProduct = sInput;
                 }
                 break;
             case OrderState.UPSELL:
-                this.uUpsell = sInput;
-                this.stateCur = OrderState.EXTRAS
-                aReturn.push("Would you like to buy Simonize car cloths or Ear Buds");
+                if (sInput == 1 || sInput == 2 || sInput == 3) {
+                    this.uUpsell = sInput;
+                    this.stateCur = OrderState.EXTRAS
+                    aReturn.push(`Would you like to buy 1. Simonize car cloths , 2. Ear Buds`);
+                } else {
+                    aReturn.push(`Please enter a valid productID`);
+                }
                 break;
             case OrderState.EXTRAS:
-                if(sInput.toLowerCase() != "no"){
-                    this.sExtras = sInput;
+                this.stateCur = OrderState.CHECKOUT
+                if (sInput == "1" || sInput == '2') {
+                    if (sInput == '1') {
+                        this.sExtras = "Simonize car cloths";
+                    } else if (sInput == '2') {
+                        this.sExtras = "Ear Buds";
+                    }
+                    aReturn.push("Would you like to buy more?");
+
+                } else if (sInput.toLowerCase() == 'no') {
+                    this.sExtras = "";
+                    aReturn.push("Would you like to buy more?");
+                } else {
+                    aReturn.push(`Please enter a valid productID or you can say 'no'`);
+                    this.stateCur = OrderState.EXTRAS;
                 }
-                aReturn.push(`product id: ${this.uUpsell + this.sProduct}`);
-                aReturn.push("Thank-you for your order of");
-                this.nTotal = 0;
-                if(this.sProduct.toLowerCase() == "cleaning" && this.uUpsell.toLowerCase() == 1){
-                  aReturn.push("Brooms and Dust Bins");
-                  this.nTotal += 4;
-                }else if(this.sProduct.toLowerCase() == "cleaning" && this.uUpsell.toLowerCase == 2){
-                  aReturn.push("Snow shovels");
-                  this.nTotal += 10;
-                }else if(this.sProduct.toLowerCase() == "electrical" && this.uUpsell.toLowerCase() == 1){
-                  aReturn.push("Light Bulbs");
-                  this.nTotal += 5.99;
-                }else if(this.sProduct.toLowerCase() == "electrical" && this.uUpsell.toLowerCase == 2){
-                  aReturn.push("Led Light");
-                  this.nTotal += 3.99;
-                }else if(this.sProduct.toLowerCase() == "electrical" && this.uUpsell.toLowerCase == 3){
-                    aReturn.push("Electric kettle");
+                break;
+            case OrderState.CHECKOUT:
+                var pdtCategory = this.sProduct.toLowerCase();
+                if (pdtCategory == "cleaning" && this.uUpsell == 1) {
+                    this.oOrder = "Brooms and Dust Bins";
+                    this.nTotal += 4;
+                } else if (pdtCategory == "cleaning" && this.uUpsell == 2) {
+                    this.oOrder = "Snow shovels";
+                    this.nTotal += 10;
+                }
+                if (pdtCategory == "electrical" && this.uUpsell == 1) {
+                    this.oOrder = "Light Bulbs";
+                    this.nTotal += 5.99;
+                } else if (pdtCategory == "electrical" && this.uUpsell == 2) {
+                    this.oOrder = "Led Light";
+                    this.nTotal += 3.99;
+                } else if (pdtCategory == "electrical" && this.uUpsell == 3) {
+                    this.oOrder = "Electric kettle";
                     this.nTotal += 13.99;
                 }
-                if(this.sExtras){
-                  aReturn.push(this.sExtras);
-                  this.nTotal += 4;
+                this.sSuccessMsg += `${this.oOrder} ${this.sProduct} `;
+                if (this.sExtras) {
+                    this.sSuccessMsg += ` with ${this.sExtras}`;
+                    this.nTotal += 4;
+                } else {
+                    this.sSuccessMsg += `.`;
                 }
-                aReturn.push(`Your total comes to ${this.nTotal}`);
-                aReturn.push(`We will text you from 519-222-2222 when your order is ready or if we have questions.`)
-                this.isDone(true);
-                break;
+                if (sInput.toLowerCase() != "no") {
+                    aReturn.push("Are you sure?");
+                    this.stateCur = OrderState.WELCOMING;
+                } else {
+                    this.tax = this.nTotal * Tax_Pay;
+                    this.totalPay = this.nTotal + this.tax;
+                    aReturn.push("Thank-you for your order of");
+                    aReturn.push(`${this.sSuccessMsg}`);
+                    aReturn.push(`SubTotal: $${this.nTotal} Tax: ${Tax_Pay}`);
+                    aReturn.push(`Your total comes to $${this.totalPay}`);
+                    aReturn.push(`We will text you from 519-001-1000 when your order is ready or if we have questions.`)
+                    this.isDone(true);
+                    break;
+                }
         }
         return aReturn;
     }
-    renderForm(){
-      // your client id should be kept private
-      return(`
+    renderForm() {
+        // your client id should be kept private
+        return (`
       <html>
 
       <head>
@@ -493,6 +532,6 @@ module.exports = class CurbsideHardwares extends Order{
       </body>
       
       </html>     `);
-  
+
     }
 }
